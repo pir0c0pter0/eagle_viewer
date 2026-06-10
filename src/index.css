@@ -226,16 +226,19 @@ body {
 .poly { stroke-dasharray: 0.5, 3; }
 .via { fill-rule: evenodd; }
 
-/* thin light separation outline on copper items (see makeHalo in render.js) */
+/* Thin light separation outline on copper items (see makeHalo/StrokeLayers
+   in render.js). --halo-extra is kept at a constant on-screen thickness by
+   main.js; --w is the item's own stroke width in board units. */
 .halo {
     fill: none;
-    stroke: rgba(255, 255, 255, 0.4);
+    stroke: rgba(255, 255, 255, 0.25);
+    stroke-width: calc(var(--w, 0.5) * 1px + var(--halo-extra, 0.15px));
     stroke-linecap: round;
     stroke-linejoin: round;
 }
 .rect, .via {
-    stroke: rgba(255, 255, 255, 0.4);
-    stroke-width: 0.08;
+    stroke: rgba(255, 255, 255, 0.25);
+    stroke-width: var(--halo-extra, 0.1px);
     paint-order: stroke;
 }
 .origin {

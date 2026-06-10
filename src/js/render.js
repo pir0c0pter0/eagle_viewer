@@ -49,17 +49,41 @@ function strokeWidth(node, width) {
     node.style.strokeWidth = w > 0 ? w : 0.5;
 }
 
-const HALO_EXTRA = 0.2; // mm added to the stroke width (0.1 each side)
-
-// Thin light outline drawn under each stroked copper item so overlapping
-// same-color shapes stay distinguishable (filled shapes get theirs from
-// the .via/.rect paint-order rule in index.css).
+// Thin light outline drawn under the copper so overlapping same-color
+// shapes stay distinguishable. The halo width tracks the on-screen zoom
+// through the --halo-extra custom property set in main.js (see .halo in
+// index.css); --w carries the item's own stroke width in board units.
 function makeHalo(node) {
     const halo = node.cloneNode(false);
     halo.setAttribute("class", node.getAttribute("class").replace(/\bwire\b/, "halo"));
     halo.removeAttribute("data-signal");
-    halo.style.strokeWidth = (parseFloat(node.style.strokeWidth) || 0) + HALO_EXTRA;
+    halo.style.strokeWidth = "";
+    halo.style.setProperty("--w", parseFloat(node.style.strokeWidth) || 0);
     return halo;
+}
+
+// Buckets stroked copper per layer: all of a layer's halos paint in one
+// group under a sibling group with all of that layer's strokes, so the
+// halo only shows along the outer contour of connected copper instead of
+// outlining every individual segment.
+class StrokeLayers {
+    #dest;
+    #groups = new Map();
+
+    constructor(dest) {
+        this.#dest = dest;
+    }
+
+    target(layer, kind) {
+        let g = this.#groups.get(layer);
+        if (!g) {
+            g = { halo: el("g"), stroke: el("g") };
+            this.#dest.appendChild(g.halo);
+            this.#dest.appendChild(g.stroke);
+            this.#groups.set(layer, g);
+        }
+        return g[kind];
+    }
 }
 
 // EAGLE rot attribute: optional S (spin), optional M (mirror), then R<angle>,
@@ -70,7 +94,7 @@ function parseRot(rot) {
     return { spin: m[1] === "S", mirrored: m[2] === "M", angle: parseFloat(m[3]) || 0 };
 }
 
-function addWire(dest, wire, signalName) {
+function addWire(strokes, wire, signalName) {
     const curve = wire.getAttribute("curve");
     let node;
     if (curve !== null) {
@@ -95,11 +119,12 @@ function addWire(dest, wire, signalName) {
             y2: wire.getAttribute("y2"),
         });
     }
-    node.setAttribute("class", `wire layer${wire.getAttribute("layer")}`);
+    const layer = wire.getAttribute("layer");
+    node.setAttribute("class", `wire layer${layer}`);
     strokeWidth(node, wire.getAttribute("width"));
     setSignalName(node, signalName);
-    dest.appendChild(makeHalo(node));
-    dest.appendChild(node);
+    strokes.target(layer, "halo").appendChild(makeHalo(node));
+    strokes.target(layer, "stroke").appendChild(node);
 }
 
 function addRect(dest, rectangle) {
@@ -233,16 +258,17 @@ function addText(dest, text, content = text.textContent) {
     dest.appendChild(t);
 }
 
-function addCircle(dest, circle) {
+function addCircle(strokes, circle) {
+    const layer = circle.getAttribute("layer");
     const c = el("circle", {
         cx: circle.getAttribute("x"),
         cy: circle.getAttribute("y"),
         r: circle.getAttribute("radius"),
-        class: `wire layer${circle.getAttribute("layer")}`,
+        class: `wire layer${layer}`,
     });
     c.style.strokeWidth = circle.getAttribute("width");
-    dest.appendChild(makeHalo(c));
-    dest.appendChild(c);
+    strokes.target(layer, "halo").appendChild(makeHalo(c));
+    strokes.target(layer, "stroke").appendChild(c);
 }
 
 function addOrigin(dest, size, className) {
@@ -323,9 +349,11 @@ export function renderBoard(xmlDoc, { boardGroup, packagesGroup }) {
     const board = xmlDoc.querySelector("eagle > drawing > board");
     if (!board) throw new Error("Not an EAGLE board file: missing <board> element");
 
+    const boardStrokes = new StrokeLayers(boardGroup);
+
     const plain = board.querySelector("plain");
     if (plain) {
-        for (const wire of plain.querySelectorAll("wire")) addWire(boardGroup, wire);
+        for (const wire of plain.querySelectorAll("wire")) addWire(boardStrokes, wire);
         for (const rect of plain.querySelectorAll("rectangle")) addRect(boardGroup, rect);
         for (const text of plain.querySelectorAll("text")) addText(boardGroup, text);
     }
@@ -335,10 +363,11 @@ export function renderBoard(xmlDoc, { boardGroup, packagesGroup }) {
         for (const pack of library.querySelectorAll("packages > package")) {
             const packageId = `${library.getAttribute("name")}___${pack.getAttribute("name")}`;
             const group = el("g", { id: packageId });
-            for (const circle of pack.querySelectorAll("circle")) addCircle(group, circle);
+            const packStrokes = new StrokeLayers(group);
+            for (const circle of pack.querySelectorAll("circle")) addCircle(packStrokes, circle);
             for (const pad of pack.querySelectorAll("pad")) addVia(group, pad, true);
             for (const smd of pack.querySelectorAll("smd")) addSmd(group, smd);
-            for (const wire of pack.querySelectorAll("wire")) addWire(group, wire);
+            for (const wire of pack.querySelectorAll("wire")) addWire(packStrokes, wire);
             // literal texts are shared; >PLACEHOLDER texts are instantiated
             // per element with the element's name/value (see addElement)
             const placeholders = [];
@@ -353,7 +382,7 @@ export function renderBoard(xmlDoc, { boardGroup, packagesGroup }) {
 
     for (const signal of board.querySelectorAll("signals > signal")) {
         const name = signal.getAttribute("name");
-        for (const wire of signal.querySelectorAll("wire")) addWire(boardGroup, wire, name);
+        for (const wire of signal.querySelectorAll("wire")) addWire(boardStrokes, wire, name);
         for (const polygon of signal.querySelectorAll("polygon"))
             addPolygon(boardGroup, polygon, name);
         for (const via of signal.querySelectorAll("via")) addVia(boardGroup, via, false, name);
