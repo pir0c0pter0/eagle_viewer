@@ -285,13 +285,57 @@ function addOrigin(dest, size, className) {
     );
 }
 
-function addElement(dest, element, packageTexts, deferredTexts) {
+// Mirrored elements sit on the opposite board side: their layers swap
+// (1 Top ↔ 16 Bottom and every t/b pair), so colors and visibility must
+// follow the bottom layers.
+const MIRROR_LAYER = {
+    1: 16, 16: 1,
+    21: 22, 22: 21,
+    23: 24, 24: 23,
+    25: 26, 26: 25,
+    27: 28, 28: 27,
+    29: 30, 30: 29,
+    31: 32, 32: 31,
+    33: 34, 34: 33,
+    35: 36, 36: 35,
+    37: 38, 38: 37,
+    39: 40, 40: 39,
+    41: 42, 42: 41,
+    51: 52, 52: 51,
+};
+
+function mirrorClasses(root) {
+    for (const node of [root, ...root.querySelectorAll("[class]")]) {
+        const cls = node.getAttribute("class");
+        if (!cls) continue;
+        node.setAttribute(
+            "class",
+            cls.replace(/\blayer(\d+)\b/g, (_, n) => `layer${MIRROR_LAYER[n] ?? n}`)
+        );
+    }
+}
+
+// A mirrored element can't share the normal package def — its layer
+// classes must be swapped. Clone the def lazily on first mirrored use.
+function ensureMirroredPackage(packagesGroup, packageId) {
+    const mirroredId = `${packageId}___MIRROR`;
+    if (!document.getElementById(mirroredId)) {
+        const clone = document.getElementById(packageId).cloneNode(true);
+        clone.setAttribute("id", mirroredId);
+        mirrorClasses(clone);
+        packagesGroup.appendChild(clone);
+    }
+    return mirroredId;
+}
+
+function addElement(dest, element, packageTexts, deferredTexts, packagesGroup) {
     const packageId = `${element.getAttribute("library")}___${element.getAttribute("package")}`;
     const { mirrored, angle } = parseRot(element.getAttribute("rot"));
     const instanceTransform = `${mirrored ? "scale(-1 1) " : ""}rotate(${angle})`;
 
     const use = el("use");
-    use.setAttribute("href", `#${packageId}`);
+    const useId = mirrored ? ensureMirroredPackage(packagesGroup, packageId) : packageId;
+    use.setAttribute("href", `#${useId}`);
     if (mirrored || angle) use.setAttribute("transform", instanceTransform);
 
     const group = el("g", {
@@ -325,6 +369,7 @@ function addElement(dest, element, packageTexts, deferredTexts) {
                 else if (text.textContent === ">VALUE") content = element.getAttribute("value");
                 if (content) addText(textGroup, text, content);
             }
+            if (mirrored) mirrorClasses(textGroup);
             group.appendChild(textGroup);
         }
     }
@@ -406,7 +451,7 @@ export function renderBoard(xmlDoc, { boardGroup, packagesGroup }) {
 
     const deferredTexts = [];
     for (const element of board.querySelectorAll("elements > element"))
-        addElement(boardGroup, element, packageTexts, deferredTexts);
+        addElement(boardGroup, element, packageTexts, deferredTexts, packagesGroup);
     for (const [attr, content] of deferredTexts)
         addText(isSilk(attr) ? silkGroup : boardGroup, attr, content);
 
