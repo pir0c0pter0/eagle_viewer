@@ -1,44 +1,48 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>EAGLE Board File Viewer</title>
-    <link type="text/css" rel="stylesheet" href="index.css">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>EAGLE Board Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+    <script type="module" src="js/main.js"></script>
 </head>
-<body onLoad="onLoadFunc()">
-<script type="text/javascript" src="index.js"></script>
-<div id="topBar">
-    <form>
-        <input type="file" onChange="loadFile(this.files[0])">
-        <span id="signalNameDisplay"></span>
-    </form>
-</div>
+<body>
+<header id="topBar">
+    <h1 class="brand">EAGLE<span>VIEWER</span></h1>
+    <label class="file-button" for="fileInput">Open .brd</label>
+    <input type="file" id="fileInput" accept=".brd,.xml">
+    <span id="boardName"></span>
+    <button id="fitButton" title="Fit board to view">Fit</button>
+</header>
 <div id="bottomAreaContainer">
-    <div id="sideBar">
-        <form id="layerCheckboxForm">
-        </form>
-    </div>
-    <div id="scrollView" onMouseDown="MouseDownHandler(event, this)" onMouseMove="MouseMoveHandler(event, this)" onMouseUp="MouseUpHandler(event, this)">
-        <svg xmlns="http://www.w3.org/2000/svg" version="1.1" id="svgElementId" style="">
-            <style type="text/css">
-                body, html {margin: 0; padding: 0}
-                .wire, .poly {fill: none; stroke-linecap: round; stroke-linejoin: round}
-                .poly {stroke-dasharray: 0.5,3}
-                .via {fill-rule: evenodd}
-                .rect, .via {stroke: none}
-                .origin {stroke: #949494; stroke-width: 1; fill: none; vector-effect: non-scaling-stroke;}
-                text {cursor: default}
-            </style>
-            <style type="text/css" id="styleSheetLayerColors">
-            </style>
-            <style type="text/css" id="styleSheetLayerVisibility">
-            </style>
-            <g id="packagesGroup" style="display: none">
-            </g>
-            <g id="boardGroup">
-            </g>
+    <aside id="sideBar">
+        <h2 class="panel-title">Layers</h2>
+        <div class="layer-presets">
+            <button data-preset="top">Top</button>
+            <button data-preset="bottom">Bottom</button>
+            <button data-preset="all">All</button>
+        </div>
+        <ul id="layerList"></ul>
+    </aside>
+    <main id="scrollView">
+        <svg id="boardSvg" xmlns="http://www.w3.org/2000/svg">
+            <style id="styleSheetLayerColors"></style>
+            <style id="styleSheetLayerVisibility"></style>
+            <style id="styleSheetHighlight"></style>
+            <defs id="packagesGroup"></defs>
+            <g id="boardGroup" transform="scale(1,-1)"></g>
         </svg>
-    </div>
+        <div id="hud">
+            <span id="hudSignal"></span>
+            <span id="hudCoords">0.00, 0.00 mm</span>
+            <span id="hudZoom">100%</span>
+        </div>
+        <div id="dropOverlay">Drop .brd file</div>
+    </main>
 </div>
 </body>
 </html>
