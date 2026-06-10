@@ -3,6 +3,8 @@
 
 const ZOOM_STEP = 1.1;
 const FIT_MARGIN = 0.05;
+const MIN_ZOOM = 0.05; // 5% of the fit view
+const MAX_ZOOM = 1000; // 100000% of the fit view
 
 export class Viewport {
     #svg;
@@ -57,22 +59,23 @@ export class Viewport {
     }
 
     #onPointerDown(e) {
-        if (e.button !== 0) return;
-        this.#drag = { x: e.clientX, y: e.clientY };
+        if (e.button !== 0 || this.#drag) return;
+        this.#drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
         this.#svg.setPointerCapture(e.pointerId);
         this.#svg.classList.add("dragging");
     }
 
     #onPointerMove(e) {
-        if (!this.#drag) return;
+        if (!this.#drag || e.pointerId !== this.#drag.id) return;
         const s = this.#scale();
         this.#view.x -= (e.clientX - this.#drag.x) * s;
         this.#view.y -= (e.clientY - this.#drag.y) * s;
-        this.#drag = { x: e.clientX, y: e.clientY };
+        this.#drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
         this.#apply();
     }
 
     #onPointerUp(e) {
+        if (this.#drag && e.pointerId !== this.#drag.id) return;
         this.#drag = null;
         this.#svg.classList.remove("dragging");
         if (this.#svg.hasPointerCapture(e.pointerId)) {
@@ -82,7 +85,18 @@ export class Viewport {
 
     #onWheel(e) {
         e.preventDefault();
-        const k = Math.pow(ZOOM_STEP, e.deltaY < 0 ? 1 : -1);
+        if (!e.deltaY) return;
+        // deltaMode 1 = lines (classic wheel); 0 = pixels (trackpads)
+        const pixels = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+        const exponent = Math.max(-3, Math.min(3, -pixels / 100));
+        let k = Math.pow(ZOOM_STEP, exponent);
+        // keep zoom within [MIN_ZOOM, MAX_ZOOM] of the fit view
+        const targetW = Math.min(
+            this.#fitView.w / MIN_ZOOM,
+            Math.max(this.#fitView.w / MAX_ZOOM, this.#view.w / k)
+        );
+        k = this.#view.w / targetW;
+        if (k === 1) return;
         const p = this.clientToBoard(e.clientX, e.clientY);
         this.#view = {
             x: p.x - (p.x - this.#view.x) / k,
