@@ -13,18 +13,18 @@
 <body>
 <header id="topBar">
     <h1 class="brand">EAGLE<span>VIEWER</span></h1>
-    <label class="file-button" for="fileInput">Open .brd</label>
     <input type="file" id="fileInput" accept=".brd,.xml">
+    <label class="file-button" for="fileInput">Open .brd</label>
     <span id="boardName"></span>
-    <button id="fitButton" title="Fit board to view">Fit</button>
+    <button type="button" id="fitButton" title="Fit board to view">Fit</button>
 </header>
 <div id="bottomAreaContainer">
     <aside id="sideBar">
         <h2 class="panel-title">Layers</h2>
         <div class="layer-presets">
-            <button data-preset="top">Top</button>
-            <button data-preset="bottom">Bottom</button>
-            <button data-preset="all">All</button>
+            <button type="button" data-preset="top">Top</button>
+            <button type="button" data-preset="bottom">Bottom</button>
+            <button type="button" data-preset="all">All</button>
         </div>
         <ul id="layerList"></ul>
     </aside>
