@@ -49,6 +49,14 @@ function strokeWidth(node, width) {
     node.style.strokeWidth = w > 0 ? w : 0.5;
 }
 
+// EAGLE rot attribute: optional S (spin), optional M (mirror), then R<angle>,
+// e.g. "R90", "MR180", "SMR0".
+function parseRot(rot) {
+    const m = /^(S?)(M?)R(-?[\d.]+)$/.exec(rot ?? "");
+    if (!m) return { spin: false, mirrored: false, angle: 0 };
+    return { spin: m[1] === "S", mirrored: m[2] === "M", angle: parseFloat(m[3]) || 0 };
+}
+
 function addWire(dest, wire, signalName) {
     const curve = wire.getAttribute("curve");
     let node;
@@ -118,6 +126,28 @@ function ring(x, y, r) {
     );
 }
 
+// Regular octagon with distance across flats = 2r (EAGLE octagon pad).
+function octagonPath(x, y, r) {
+    const circum = r / Math.cos(Math.PI / 8);
+    const points = [];
+    for (let i = 0; i < 8; i++) {
+        const a = Math.PI / 8 + (i * Math.PI) / 4;
+        points.push(`${x + circum * Math.cos(a)} ${y + circum * Math.sin(a)}`);
+    }
+    return `M${points.join(" L")} Z`;
+}
+
+// Capsule of radius r along x between circle centers x1 and x2.
+function stadiumPath(x1, x2, y, r) {
+    return (
+        `M${x1} ${y - r}` +
+        ` L${x2} ${y - r}` +
+        ` A${r} ${r} 0 0 1 ${x2} ${y + r}` +
+        ` L${x1} ${y + r}` +
+        ` A${r} ${r} 0 0 1 ${x1} ${y - r} Z`
+    );
+}
+
 function addVia(dest, via, actuallyPad, signalName) {
     const x = parseFloat(via.getAttribute("x"));
     const y = parseFloat(via.getAttribute("y"));
@@ -126,14 +156,20 @@ function addVia(dest, via, actuallyPad, signalName) {
     const diameter = via.getAttribute("diameter");
     if (diameter !== null) radius = parseFloat(diameter) / 2;
 
-    let d = "";
-    // TODO other shapes besides square and round (octagon, long, offset)
-    if (via.getAttribute("shape") === "square") {
+    const shape = via.getAttribute("shape");
+    let d;
+    if (shape === "square") {
         d =
             `M${x - radius} ${y - radius}` +
             ` L${x + radius} ${y - radius}` +
             ` L${x + radius} ${y + radius}` +
             ` L${x - radius} ${y + radius} Z`;
+    } else if (shape === "octagon") {
+        d = octagonPath(x, y, radius);
+    } else if (shape === "long") {
+        d = stadiumPath(x - radius, x + radius, y, radius);
+    } else if (shape === "offset") {
+        d = stadiumPath(x, x + 2 * radius, y, radius); // drill in the round end
     } else {
         d = ring(x, y, radius);
     }
@@ -141,9 +177,11 @@ function addVia(dest, via, actuallyPad, signalName) {
 
     const path = el("path", {
         d,
-        "fill-rule": "evenodd", // outer ring + drill hole
+        "fill-rule": "evenodd", // outer shape + drill hole
         class: `via layer${actuallyPad ? PAD_LAYER : VIA_LAYER}`,
     });
+    const { angle } = parseRot(via.getAttribute("rot"));
+    if (angle) path.setAttribute("transform", `rotate(${angle} ${x} ${y})`);
     setSignalName(path, signalName);
     dest.appendChild(path);
 }
@@ -160,17 +198,24 @@ function addSmd(dest, smd) {
         height: dy,
         class: `via layer${smd.getAttribute("layer")}`,
     });
+    const { angle } = parseRot(smd.getAttribute("rot"));
+    if (angle) rect.setAttribute("transform", `rotate(${angle} ${x} ${y})`);
     dest.appendChild(rect);
 }
 
-function addText(dest, text) {
+function addText(dest, text, content = text.textContent) {
+    const { mirrored, angle } = parseRot(text.getAttribute("rot"));
+    let transform = `translate(${text.getAttribute("x")} ${text.getAttribute("y")})`;
+    if (angle) transform += ` rotate(${angle})`;
+    transform += " scale(1, -1)"; // glyphs back to y-down text space
+    if (mirrored) transform += " scale(-1, 1)"; // EAGLE shows mirrored text mirrored
     const t = el("text", {
         "font-family": "IBM Plex Mono, monospace",
         "font-size": `${parseFloat(text.getAttribute("size")) * 1.4}px`,
-        transform: `translate(${text.getAttribute("x")} ${text.getAttribute("y")}) scale(1, -1)`,
+        transform,
         class: `layer${text.getAttribute("layer")}`,
     });
-    t.textContent = text.textContent;
+    t.textContent = content;
     dest.appendChild(t);
 }
 
@@ -195,25 +240,35 @@ function addOrigin(dest, size, className) {
     );
 }
 
-function addElement(dest, element) {
+function addElement(dest, element, packageTexts) {
+    const packageId = `${element.getAttribute("library")}___${element.getAttribute("package")}`;
+    const { mirrored, angle } = parseRot(element.getAttribute("rot"));
+    const instanceTransform = `${mirrored ? "scale(-1 1) " : ""}rotate(${angle})`;
+
     const use = el("use");
-    use.setAttribute(
-        "href",
-        `#${element.getAttribute("library")}___${element.getAttribute("package")}`
-    );
-    const rot = element.getAttribute("rot");
-    let mirrored = false;
-    if (rot !== null) {
-        // TODO handle EAGLE spin flag, e.g. rot="SMR0" (legacy parity bug:
-        // mirror is misdetected and the rotate() becomes invalid)
-        mirrored = rot.startsWith("M");
-        const angle = rot.slice(mirrored ? 2 : 1) || "0";
-        use.setAttribute("transform", `${mirrored ? "scale(-1 1) " : ""}rotate(${angle})`);
-    }
+    use.setAttribute("href", `#${packageId}`);
+    if (mirrored || angle) use.setAttribute("transform", instanceTransform);
+
     const group = el("g", {
         transform: `translate(${element.getAttribute("x")} ${element.getAttribute("y")})`,
     });
     group.appendChild(use);
+
+    // >NAME / >VALUE placeholders are per-instance, so they can't live in
+    // the shared package <defs> — instantiate them here with real values.
+    const placeholders = packageTexts.get(packageId) ?? [];
+    if (placeholders.length) {
+        const textGroup = el("g");
+        if (mirrored || angle) textGroup.setAttribute("transform", instanceTransform);
+        for (const text of placeholders) {
+            let content;
+            if (text.textContent === ">NAME") content = element.getAttribute("name");
+            else if (text.textContent === ">VALUE") content = element.getAttribute("value");
+            if (content) addText(textGroup, text, content);
+        }
+        group.appendChild(textGroup);
+    }
+
     dest.appendChild(group);
     // getBBox needs the <use> to be in the live document
     addOrigin(group, use.getBBox(), `layer${mirrored ? BORIGIN_LAYER : TORIGIN_LAYER}`);
@@ -245,15 +300,23 @@ export function renderBoard(xmlDoc, { boardGroup, packagesGroup }) {
         for (const text of plain.querySelectorAll("text")) addText(boardGroup, text);
     }
 
+    const packageTexts = new Map();
     for (const library of board.querySelectorAll("libraries > library")) {
         for (const pack of library.querySelectorAll("packages > package")) {
-            const group = el("g", {
-                id: `${library.getAttribute("name")}___${pack.getAttribute("name")}`,
-            });
+            const packageId = `${library.getAttribute("name")}___${pack.getAttribute("name")}`;
+            const group = el("g", { id: packageId });
             for (const circle of pack.querySelectorAll("circle")) addCircle(group, circle);
             for (const pad of pack.querySelectorAll("pad")) addVia(group, pad, true);
             for (const smd of pack.querySelectorAll("smd")) addSmd(group, smd);
             for (const wire of pack.querySelectorAll("wire")) addWire(group, wire);
+            // literal texts are shared; >PLACEHOLDER texts are instantiated
+            // per element with the element's name/value (see addElement)
+            const placeholders = [];
+            for (const text of pack.querySelectorAll("text")) {
+                if (text.textContent.startsWith(">")) placeholders.push(text);
+                else addText(group, text);
+            }
+            if (placeholders.length) packageTexts.set(packageId, placeholders);
             packagesGroup.appendChild(group);
         }
     }
@@ -267,5 +330,5 @@ export function renderBoard(xmlDoc, { boardGroup, packagesGroup }) {
     }
 
     for (const element of board.querySelectorAll("elements > element"))
-        addElement(boardGroup, element);
+        addElement(boardGroup, element, packageTexts);
 }
