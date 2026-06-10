@@ -255,7 +255,7 @@ function addOrigin(dest, size, className) {
     );
 }
 
-function addElement(dest, element, packageTexts) {
+function addElement(dest, element, packageTexts, deferredTexts) {
     const packageId = `${element.getAttribute("library")}___${element.getAttribute("package")}`;
     const { mirrored, angle } = parseRot(element.getAttribute("rot"));
     const instanceTransform = `${mirrored ? "scale(-1 1) " : ""}rotate(${angle})`;
@@ -281,7 +281,8 @@ function addElement(dest, element, packageTexts) {
             if (key === "NAME") content = element.getAttribute("name");
             else if (key === "VALUE") content = element.getAttribute("value");
             else content = attr.getAttribute("value");
-            if (content) addText(dest, attr, content);
+            // deferred so labels paint above every package, not under them
+            if (content) deferredTexts.push([attr, content]);
         }
     } else {
         const placeholders = packageTexts.get(packageId) ?? [];
@@ -358,6 +359,8 @@ export function renderBoard(xmlDoc, { boardGroup, packagesGroup }) {
         for (const via of signal.querySelectorAll("via")) addVia(boardGroup, via, false, name);
     }
 
+    const deferredTexts = [];
     for (const element of board.querySelectorAll("elements > element"))
-        addElement(boardGroup, element, packageTexts);
+        addElement(boardGroup, element, packageTexts, deferredTexts);
+    for (const [attr, content] of deferredTexts) addText(boardGroup, attr, content);
 }
