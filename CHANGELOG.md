@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-06-10
+
+### Fixed
+
+- Mirrored (bottom-side) elements now swap their layer classes (1↔16 and all
+  t/b pairs) through a lazily cloned package definition, so their SMD pads and
+  silkscreen render with bottom-layer colors and respond to the Bottom layer
+  toggles — previously they kept top-layer red and visibility.
+
 ## [2.0.0] - 2026-06-10
 
 Complete frontend modernization: the single legacy script (IE6-era) was replaced
