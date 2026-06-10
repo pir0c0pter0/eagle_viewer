@@ -7,7 +7,7 @@
     --copper: #e8965a;
     --copper-dim: #9a5f33;
     --grid: rgba(255, 255, 255, 0.035);
-    --silk-opacity: 0.9;
+    --silk-opacity: 0.75;
     --pad-opacity: 0.8;
     --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
     --font-label: "Archivo Narrow", "Arial Narrow", sans-serif;
@@ -249,6 +249,12 @@ body {
 
 /* silkscreen/overlay layers paint above the copper, slightly translucent */
 .silk { opacity: var(--silk-opacity); }
+
+/* silkscreen draws in white, overriding the EAGLE layer colors
+   (g.silk outranks the generated .wire.layerN / text.layerN rules) */
+g.silk .wire { stroke: #ffffff; }
+g.silk text { fill: #ffffff; }
+g.silk .rect { fill: #ffffff; }
 .origin {
     stroke: #949494;
     stroke-width: 1;
