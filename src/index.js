@@ -66,7 +66,17 @@ function deleteAllChildren(myNode)
     }
 }
 
-function addWire(dest, wire)
+function setSignalName(node, signalName)
+{
+    if (!signalName)
+        return;
+    node.setAttribute("data-signal", signalName);
+    var title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+    title.appendChild(document.createTextNode(signalName));
+    node.appendChild(title);
+}
+
+function addWire(dest, wire, signalName)
 {
     var curveAttr = wire.getAttribute("curve");
     if (curveAttr !== null)
@@ -91,6 +101,7 @@ function addWire(dest, wire)
         path.style.strokeWidth = parseFloat(wire.getAttribute("width"));
         if (path.style.strokeWidth == 0.0)
             path.style.strokeWidth = 0.5;
+        setSignalName(path, signalName);
         dest.appendChild(path);
     }
     else
@@ -104,6 +115,7 @@ function addWire(dest, wire)
         line.style.strokeWidth = parseFloat(wire.getAttribute("width"));
         if (line.style.strokeWidth == 0.0)
             line.style.strokeWidth = 0.5;
+        setSignalName(line, signalName);
         dest.appendChild(line);
     }
 }
@@ -123,7 +135,7 @@ function addRect(dest, wire)
     dest.appendChild(rect);
 }
 
-function addPolygon(dest, polygon)
+function addPolygon(dest, polygon, signalName)
 {
     var poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
     var vertices = polygon.getElementsByTagName("vertex");
@@ -136,10 +148,11 @@ function addPolygon(dest, polygon)
     poly.setAttribute("points", txt);
     poly.setAttribute("class", "poly layer" + polygon.getAttribute("layer"));
     poly.style.strokeWidth = polygon.getAttribute("width");
+    setSignalName(poly, signalName);
     dest.appendChild(poly);
 }
 
-function addVia(dest, via, actuallyPad)
+function addVia(dest, via, actuallyPad, signalName)
 {
     var x = parseFloat(via.getAttribute("x"));
     var y = parseFloat(via.getAttribute("y"));
@@ -178,6 +191,7 @@ function addVia(dest, via, actuallyPad)
     txt += " Z";
     path.setAttribute("d", txt);
     path.setAttribute("class", "via layer" + (actuallyPad ? PAD_LAYER : VIA_LAYER).toString());
+    setSignalName(path, signalName);
     dest.appendChild(path);
 }
 
@@ -209,11 +223,11 @@ function addText(dest, text)
     dest.appendChild(t);
 }
 
-function addWires(dest, wires)
+function addWires(dest, wires, signalName)
 {
     for (var i = 0; i < wires.length; i++)
     {
-        addWire(dest, wires[i]);
+        addWire(dest, wires[i], signalName);
     }
 }
 
@@ -225,19 +239,19 @@ function addRects(dest, rects)
     }
 }
 
-function addPolygons(dest, polys)
+function addPolygons(dest, polys, signalName)
 {
     for (var i = 0; i < polys.length; i++)
     {
-        addPolygon(dest, polys[i]);
+        addPolygon(dest, polys[i], signalName);
     }
 }
 
-function addVias(dest, vias)
+function addVias(dest, vias, signalName)
 {
     for (var i = 0; i < vias.length; i++)
     {
-        addVia(dest, vias[i]);
+        addVia(dest, vias[i], false, signalName);
     }
 }
 
@@ -357,6 +371,16 @@ function MouseWheelHandler(e)
     return false;
 }
 
+function SignalHoverHandler(e)
+{
+    var display = document.getElementById("signalNameDisplay");
+    var name = null;
+    if (e.type == "mouseover" && e.target.getAttribute)
+        name = e.target.getAttribute("data-signal");
+    deleteAllChildren(display);
+    display.appendChild(document.createTextNode(name ? name : ""));
+}
+
 function onLoadFunc()
 {
     var scrollView = document.getElementById("scrollView");
@@ -370,6 +394,13 @@ function onLoadFunc()
     // IE 6/7/8
     else
         scrollView.attachEvent("onmousewheel", MouseWheelHandler);
+
+    var svgElement = document.getElementById("svgElementId");
+    if (svgElement.addEventListener)
+    {
+        svgElement.addEventListener("mouseover", SignalHoverHandler, false);
+        svgElement.addEventListener("mouseout", SignalHoverHandler, false);
+    }
 
     var boardDocument = loadXMLDoc("Arduino_MEGA2560_ref.brd");
     loadBoard(boardDocument);
@@ -497,12 +528,13 @@ function loadBoard(boardDocument)
         var signals = board.getElementsByTagName("signals")[0].getElementsByTagName("signal");
         for (var i = 0; i < signals.length; i++)
         {
+            var signalName = signals[i].getAttribute("name");
             var wires = signals[i].getElementsByTagName("wire");
-            addWires(boardGroup, wires);
+            addWires(boardGroup, wires, signalName);
             var polygons = signals[i].getElementsByTagName("polygon");
-            addPolygons(boardGroup, polygons);
+            addPolygons(boardGroup, polygons, signalName);
             var vias = signals[i].getElementsByTagName("via");
-            addVias(boardGroup, vias);
+            addVias(boardGroup, vias, signalName);
         }
     }
     {
