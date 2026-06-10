@@ -7,7 +7,8 @@
     --copper: #e8965a;
     --copper-dim: #9a5f33;
     --grid: rgba(255, 255, 255, 0.035);
-    --silk-opacity: 0.45;
+    --silk-opacity: 0.75;
+    --pad-opacity: 0.8;
     --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
     --font-label: "Archivo Narrow", "Arial Narrow", sans-serif;
 }
@@ -242,6 +243,9 @@ body {
     stroke-width: var(--halo-extra, 0.1px);
     paint-order: stroke;
 }
+
+/* vias, pads and SMDs slightly translucent so the copper shows through */
+.via { opacity: var(--pad-opacity); }
 
 /* silkscreen/overlay layers paint above the copper, slightly translucent */
 .silk { opacity: var(--silk-opacity); }
