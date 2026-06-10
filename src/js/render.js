@@ -141,6 +141,7 @@ function addVia(dest, via, actuallyPad, signalName) {
 
     const path = el("path", {
         d,
+        "fill-rule": "evenodd", // outer ring + drill hole
         class: `via layer${actuallyPad ? PAD_LAYER : VIA_LAYER}`,
     });
     setSignalName(path, signalName);
@@ -203,6 +204,8 @@ function addElement(dest, element) {
     const rot = element.getAttribute("rot");
     let mirrored = false;
     if (rot !== null) {
+        // TODO handle EAGLE spin flag, e.g. rot="SMR0" (legacy parity bug:
+        // mirror is misdetected and the rotate() becomes invalid)
         mirrored = rot.startsWith("M");
         const angle = rot.slice(mirrored ? 2 : 1) || "0";
         use.setAttribute("transform", `${mirrored ? "scale(-1 1) " : ""}rotate(${angle})`);
