@@ -271,17 +271,31 @@ function addElement(dest, element, packageTexts) {
 
     // >NAME / >VALUE placeholders are per-instance, so they can't live in
     // the shared package <defs> — instantiate them here with real values.
-    const placeholders = packageTexts.get(packageId) ?? [];
-    if (placeholders.length) {
-        const textGroup = el("g");
-        if (mirrored || angle) textGroup.setAttribute("transform", instanceTransform);
-        for (const text of placeholders) {
+    // Smashed elements override them with <attribute> children positioned
+    // in absolute board coordinates.
+    if (element.getAttribute("smashed") === "yes") {
+        for (const attr of element.querySelectorAll("attribute")) {
+            if (attr.getAttribute("x") === null || attr.getAttribute("size") === null) continue;
+            const key = attr.getAttribute("name");
             let content;
-            if (text.textContent === ">NAME") content = element.getAttribute("name");
-            else if (text.textContent === ">VALUE") content = element.getAttribute("value");
-            if (content) addText(textGroup, text, content);
+            if (key === "NAME") content = element.getAttribute("name");
+            else if (key === "VALUE") content = element.getAttribute("value");
+            else content = attr.getAttribute("value");
+            if (content) addText(dest, attr, content);
         }
-        group.appendChild(textGroup);
+    } else {
+        const placeholders = packageTexts.get(packageId) ?? [];
+        if (placeholders.length) {
+            const textGroup = el("g");
+            if (mirrored || angle) textGroup.setAttribute("transform", instanceTransform);
+            for (const text of placeholders) {
+                let content;
+                if (text.textContent === ">NAME") content = element.getAttribute("name");
+                else if (text.textContent === ">VALUE") content = element.getAttribute("value");
+                if (content) addText(textGroup, text, content);
+            }
+            group.appendChild(textGroup);
+        }
     }
 
     dest.appendChild(group);
