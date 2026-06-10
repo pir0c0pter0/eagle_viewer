@@ -47,7 +47,22 @@ body {
 
 .brand span { color: var(--copper); }
 
-#fileInput { display: none; }
+/* visually hidden but focusable, so keyboard users can reach Open .brd */
+#fileInput {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+
+#fileInput:focus-visible + .file-button {
+    outline: 2px solid var(--copper);
+    outline-offset: 2px;
+}
 
 .file-button,
 #fitButton {
@@ -226,6 +241,7 @@ body {
 
 #hud {
     position: absolute;
+    z-index: 1;
     right: 14px;
     bottom: 14px;
     display: flex;

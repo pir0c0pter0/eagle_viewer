@@ -117,6 +117,7 @@ export function initDragDrop(zone, overlay, onFile) {
     let depth = 0;
     zone.addEventListener("dragenter", (e) => {
         e.preventDefault();
+        if (!e.dataTransfer?.types.includes("Files")) return;
         depth++;
         overlay.classList.add("visible");
     });
