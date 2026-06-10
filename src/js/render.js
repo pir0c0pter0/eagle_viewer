@@ -28,6 +28,10 @@ const VIA_LAYER = 18;
 const TORIGIN_LAYER = 23;
 const BORIGIN_LAYER = 24;
 
+// Overlay layers drawn above the copper: t/bPlace, t/bNames, t/bValues,
+// t/bDocu. Routed into translucent "silk" groups painted last.
+const SILK_LAYERS = new Set(["21", "22", "25", "26", "27", "28", "51", "52"]);
+
 function el(name, attrs = {}) {
     const node = document.createElementNS(SVG_NS, name);
     for (const [key, value] of Object.entries(attrs)) {
@@ -313,7 +317,7 @@ function addElement(dest, element, packageTexts, deferredTexts) {
     } else {
         const placeholders = packageTexts.get(packageId) ?? [];
         if (placeholders.length) {
-            const textGroup = el("g");
+            const textGroup = el("g", { class: "silk" });
             if (mirrored || angle) textGroup.setAttribute("transform", instanceTransform);
             for (const text of placeholders) {
                 let content;
@@ -350,12 +354,19 @@ export function renderBoard(xmlDoc, { boardGroup, packagesGroup }) {
     if (!board) throw new Error("Not an EAGLE board file: missing <board> element");
 
     const boardStrokes = new StrokeLayers(boardGroup);
+    // silkscreen paints above everything else (appended last, see below)
+    const silkGroup = el("g", { class: "silk" });
+    const silkStrokes = new StrokeLayers(silkGroup);
+    const isSilk = (node) => SILK_LAYERS.has(node.getAttribute("layer"));
 
     const plain = board.querySelector("plain");
     if (plain) {
-        for (const wire of plain.querySelectorAll("wire")) addWire(boardStrokes, wire);
-        for (const rect of plain.querySelectorAll("rectangle")) addRect(boardGroup, rect);
-        for (const text of plain.querySelectorAll("text")) addText(boardGroup, text);
+        for (const wire of plain.querySelectorAll("wire"))
+            addWire(isSilk(wire) ? silkStrokes : boardStrokes, wire);
+        for (const rect of plain.querySelectorAll("rectangle"))
+            addRect(isSilk(rect) ? silkGroup : boardGroup, rect);
+        for (const text of plain.querySelectorAll("text"))
+            addText(isSilk(text) ? silkGroup : boardGroup, text);
     }
 
     const packageTexts = new Map();
@@ -363,19 +374,24 @@ export function renderBoard(xmlDoc, { boardGroup, packagesGroup }) {
         for (const pack of library.querySelectorAll("packages > package")) {
             const packageId = `${library.getAttribute("name")}___${pack.getAttribute("name")}`;
             const group = el("g", { id: packageId });
+            const packSilk = el("g", { class: "silk" });
             const packStrokes = new StrokeLayers(group);
-            for (const circle of pack.querySelectorAll("circle")) addCircle(packStrokes, circle);
+            const packSilkStrokes = new StrokeLayers(packSilk);
+            for (const circle of pack.querySelectorAll("circle"))
+                addCircle(isSilk(circle) ? packSilkStrokes : packStrokes, circle);
             for (const pad of pack.querySelectorAll("pad")) addVia(group, pad, true);
             for (const smd of pack.querySelectorAll("smd")) addSmd(group, smd);
-            for (const wire of pack.querySelectorAll("wire")) addWire(packStrokes, wire);
+            for (const wire of pack.querySelectorAll("wire"))
+                addWire(isSilk(wire) ? packSilkStrokes : packStrokes, wire);
             // literal texts are shared; >PLACEHOLDER texts are instantiated
             // per element with the element's name/value (see addElement)
             const placeholders = [];
             for (const text of pack.querySelectorAll("text")) {
                 if (text.textContent.startsWith(">")) placeholders.push(text);
-                else addText(group, text);
+                else addText(isSilk(text) ? packSilk : group, text);
             }
             if (placeholders.length) packageTexts.set(packageId, placeholders);
+            group.appendChild(packSilk); // package silk above its own pads
             packagesGroup.appendChild(group);
         }
     }
@@ -391,5 +407,8 @@ export function renderBoard(xmlDoc, { boardGroup, packagesGroup }) {
     const deferredTexts = [];
     for (const element of board.querySelectorAll("elements > element"))
         addElement(boardGroup, element, packageTexts, deferredTexts);
-    for (const [attr, content] of deferredTexts) addText(boardGroup, attr, content);
+    for (const [attr, content] of deferredTexts)
+        addText(isSilk(attr) ? silkGroup : boardGroup, attr, content);
+
+    boardGroup.appendChild(silkGroup);
 }
