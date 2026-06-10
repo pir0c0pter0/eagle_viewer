@@ -8,6 +8,11 @@ body {
 #topBar {
     flex: 0 0 auto;
 }
+#signalNameDisplay {
+    margin-left: 1em;
+    font-family: monospace;
+    font-weight: bold;
+}
 #bottomAreaContainer {
     display: flex;
     flex-direction: row;
