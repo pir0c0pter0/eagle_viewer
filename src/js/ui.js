@@ -31,10 +31,11 @@ export class LayerPanel {
         this.#colorStyleEl.textContent = layers
             .map((l) => {
                 const c = LAYER_COLORS[l.color % LAYER_COLORS.length];
+                const n = CSS.escape(l.number); // untrusted .brd attribute
                 return (
-                    `.poly.layer${l.number}, .wire.layer${l.number} { stroke: ${c}; }\n` +
-                    `.via.layer${l.number}, .rect.layer${l.number} { fill: ${c}; }\n` +
-                    `text.layer${l.number} { fill: ${c}; }`
+                    `.poly.layer${n}, .wire.layer${n} { stroke: ${c}; }\n` +
+                    `.via.layer${n}, .rect.layer${n} { fill: ${c}; }\n` +
+                    `text.layer${n} { fill: ${c}; }`
                 );
             })
             .join("\n");
@@ -88,7 +89,7 @@ export class LayerPanel {
     #applyVisibility() {
         let css = "";
         for (const [number, visible] of this.#visibility) {
-            if (!visible) css += `.layer${number} { display: none; }\n`;
+            if (!visible) css += `.layer${CSS.escape(number)} { display: none; }\n`;
         }
         this.#visibilityStyleEl.textContent = css;
     }
