@@ -27,6 +27,26 @@ const viewport = new Viewport(svg, {
     },
 });
 
+// Fit to the Dimension layer (20, the physical board outline) when present,
+// so oversized copper texts don't inflate the fit view. Only direct children
+// are considered — they share boardGroup's coordinate space.
+function fitBBox() {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const node of boardGroup.querySelectorAll(":scope > .layer20")) {
+        const b = node.getBBox();
+        if (b.width === 0 && b.height === 0) continue;
+        minX = Math.min(minX, b.x);
+        minY = Math.min(minY, b.y);
+        maxX = Math.max(maxX, b.x + b.width);
+        maxY = Math.max(maxY, b.y + b.height);
+    }
+    if (minX === Infinity) return boardGroup.getBBox();
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
 function loadBoardXml(text, name) {
     const xmlDoc = new DOMParser().parseFromString(text, "application/xml");
     if (xmlDoc.querySelector("parsererror")) {
@@ -40,7 +60,7 @@ function loadBoardXml(text, name) {
         return;
     }
     panel.setLayers(parseLayers(xmlDoc));
-    const b = boardGroup.getBBox();
+    const b = fitBBox();
     // board group is scale(1,-1): flip bbox into root SVG coords
     viewport.setContent({ x: b.x, y: -(b.y + b.height), width: b.width, height: b.height });
     boardName.textContent = name;
