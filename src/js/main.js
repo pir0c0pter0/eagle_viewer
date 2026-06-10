@@ -4,6 +4,8 @@ import { LayerPanel, initSignalHover, initDragDrop } from "./ui.js";
 
 const SAMPLE_BOARD = "Arduino_MEGA2560_ref.brd";
 
+let boardLoaded = false;
+
 const svg = document.getElementById("boardSvg");
 const boardGroup = document.getElementById("boardGroup");
 const packagesGroup = document.getElementById("packagesGroup");
@@ -42,17 +44,23 @@ function loadBoardXml(text, name) {
     // board group is scale(1,-1): flip bbox into root SVG coords
     viewport.setContent({ x: b.x, y: -(b.y + b.height), width: b.width, height: b.height });
     boardName.textContent = name;
+    boardLoaded = true;
     boardGroup.classList.remove("board-in");
     svg.getBoundingClientRect(); // restart the entry animation
     boardGroup.classList.add("board-in");
 }
 
 async function loadFile(file) {
-    loadBoardXml(await file.text(), file.name);
+    try {
+        loadBoardXml(await file.text(), file.name);
+    } catch {
+        boardName.textContent = `could not read ${file.name}`;
+    }
 }
 
 document.getElementById("fileInput").addEventListener("change", (e) => {
     if (e.target.files[0]) loadFile(e.target.files[0]);
+    e.target.value = "";
 });
 
 document.getElementById("fitButton").addEventListener("click", () => viewport.fit());
@@ -70,7 +78,9 @@ fetch(SAMPLE_BOARD)
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.text();
     })
-    .then((text) => loadBoardXml(text, SAMPLE_BOARD))
+    .then((text) => {
+        if (!boardLoaded) loadBoardXml(text, SAMPLE_BOARD);
+    })
     .catch(() => {
-        boardName.textContent = "drop a .brd file to start";
+        if (!boardLoaded) boardName.textContent = "drop a .brd file to start";
     });
