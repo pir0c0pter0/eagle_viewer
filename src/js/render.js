@@ -66,13 +66,26 @@ function makeHalo(node) {
     return halo;
 }
 
+// Paint order for stroked layers, viewed from the top side: bottom copper
+// first, inner layers (15 → 2), top copper, then non-copper strokes
+// (dimension, unrouted, docu) above the copper.
+function layerRank(layer) {
+    const n = parseInt(layer, 10);
+    if (n === 16) return 0;
+    if (n >= 2 && n <= 15) return 16 - n;
+    if (n === 1) return 15;
+    return 16;
+}
+
 // Buckets stroked copper per layer: all of a layer's halos paint in one
 // group under a sibling group with all of that layer's strokes, so the
 // halo only shows along the outer contour of connected copper instead of
-// outlining every individual segment.
+// outlining every individual segment. Buckets are kept in layerRank order
+// regardless of the order layers appear in the XML.
 class StrokeLayers {
     #dest;
     #groups = new Map();
+    #order = []; // { rank, halo } in document order
 
     constructor(dest) {
         this.#dest = dest;
@@ -81,9 +94,16 @@ class StrokeLayers {
     target(layer, kind) {
         let g = this.#groups.get(layer);
         if (!g) {
+            const rank = layerRank(layer);
             g = { halo: el("g"), stroke: el("g") };
-            this.#dest.appendChild(g.halo);
-            this.#dest.appendChild(g.stroke);
+            const next = this.#order.find((entry) => entry.rank > rank);
+            this.#dest.insertBefore(g.halo, next ? next.halo : null);
+            this.#dest.insertBefore(g.stroke, next ? next.halo : null);
+            this.#order.splice(
+                next ? this.#order.indexOf(next) : this.#order.length,
+                0,
+                { rank, halo: g.halo }
+            );
             this.#groups.set(layer, g);
         }
         return g[kind];
@@ -398,6 +418,11 @@ export function renderBoard(xmlDoc, { boardGroup, packagesGroup }) {
     const board = xmlDoc.querySelector("eagle > drawing > board");
     if (!board) throw new Error("Not an EAGLE board file: missing <board> element");
 
+    // mirrored (bottom-side) elements paint under the board copper,
+    // matching the view from the top side
+    const bottomElements = el("g");
+    boardGroup.appendChild(bottomElements);
+
     const boardStrokes = new StrokeLayers(boardGroup);
     // silkscreen paints above everything else (appended last, see below)
     const silkGroup = el("g", { class: "silk" });
@@ -450,8 +475,11 @@ export function renderBoard(xmlDoc, { boardGroup, packagesGroup }) {
     }
 
     const deferredTexts = [];
-    for (const element of board.querySelectorAll("elements > element"))
-        addElement(boardGroup, element, packageTexts, deferredTexts, packagesGroup);
+    for (const element of board.querySelectorAll("elements > element")) {
+        const { mirrored } = parseRot(element.getAttribute("rot"));
+        const dest = mirrored ? bottomElements : boardGroup;
+        addElement(dest, element, packageTexts, deferredTexts, packagesGroup);
+    }
     for (const [attr, content] of deferredTexts)
         addText(isSilk(attr) ? silkGroup : boardGroup, attr, content);
 
