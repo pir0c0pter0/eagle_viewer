@@ -49,6 +49,19 @@ function strokeWidth(node, width) {
     node.style.strokeWidth = w > 0 ? w : 0.5;
 }
 
+const HALO_EXTRA = 0.2; // mm added to the stroke width (0.1 each side)
+
+// Thin light outline drawn under each stroked copper item so overlapping
+// same-color shapes stay distinguishable (filled shapes get theirs from
+// the .via/.rect paint-order rule in index.css).
+function makeHalo(node) {
+    const halo = node.cloneNode(false);
+    halo.setAttribute("class", node.getAttribute("class").replace(/\bwire\b/, "halo"));
+    halo.removeAttribute("data-signal");
+    halo.style.strokeWidth = (parseFloat(node.style.strokeWidth) || 0) + HALO_EXTRA;
+    return halo;
+}
+
 // EAGLE rot attribute: optional S (spin), optional M (mirror), then R<angle>,
 // e.g. "R90", "MR180", "SMR0".
 function parseRot(rot) {
@@ -85,6 +98,7 @@ function addWire(dest, wire, signalName) {
     node.setAttribute("class", `wire layer${wire.getAttribute("layer")}`);
     strokeWidth(node, wire.getAttribute("width"));
     setSignalName(node, signalName);
+    dest.appendChild(makeHalo(node));
     dest.appendChild(node);
 }
 
@@ -227,6 +241,7 @@ function addCircle(dest, circle) {
         class: `wire layer${circle.getAttribute("layer")}`,
     });
     c.style.strokeWidth = circle.getAttribute("width");
+    dest.appendChild(makeHalo(c));
     dest.appendChild(c);
 }
 

@@ -225,7 +225,19 @@ body {
 .wire, .poly { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .poly { stroke-dasharray: 0.5, 3; }
 .via { fill-rule: evenodd; }
-.rect, .via { stroke: none; }
+
+/* thin light separation outline on copper items (see makeHalo in render.js) */
+.halo {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.4);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.rect, .via {
+    stroke: rgba(255, 255, 255, 0.4);
+    stroke-width: 0.08;
+    paint-order: stroke;
+}
 .origin {
     stroke: #949494;
     stroke-width: 1;
