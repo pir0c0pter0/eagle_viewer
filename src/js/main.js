@@ -21,21 +21,35 @@ const panel = new LayerPanel({
     visibilityStyleEl: document.getElementById("styleSheetLayerVisibility"),
 });
 
+const HALO_PX = 1.2; // separation outline thickness on screen, in pixels
+
+// The copper separation outline keeps a constant on-screen thickness:
+// --halo-extra is in board units, so it must follow the zoom.
+function setHaloWidth(vp) {
+    svg.style.setProperty("--halo-extra", `${(vp.unitsPerPixel * HALO_PX).toFixed(5)}px`);
+}
+
 const viewport = new Viewport(svg, {
     onChange: (vp) => {
         hudZoom.textContent = `${Math.round(vp.zoomPercent)}%`;
+        setHaloWidth(vp);
     },
 });
 
+window.addEventListener("resize", () => setHaloWidth(viewport));
+
 // Fit to the Dimension layer (20, the physical board outline) when present,
-// so oversized copper texts don't inflate the fit view. Only direct children
-// are considered — they share boardGroup's coordinate space.
+// so oversized copper texts don't inflate the fit view. Only nodes inside
+// untransformed top-level groups are considered — they share boardGroup's
+// coordinate space (stroked wires live one level down, in StrokeLayers groups).
 function fitBBox() {
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
-    for (const node of boardGroup.querySelectorAll(":scope > .layer20")) {
+    for (const node of boardGroup.querySelectorAll(
+        ":scope > .layer20, :scope > g > .wire.layer20"
+    )) {
         const b = node.getBBox();
         if (b.width === 0 && b.height === 0) continue;
         minX = Math.min(minX, b.x);

@@ -27,6 +27,11 @@ export class Viewport {
         return (this.#fitView.w / this.#view.w) * 100;
     }
 
+    // board units per CSS pixel of the rendered view
+    get unitsPerPixel() {
+        return this.#scale();
+    }
+
     // bbox in root SVG coordinates (y already flipped by the caller)
     setContent(bbox) {
         const mx = bbox.width * FIT_MARGIN || 1;
