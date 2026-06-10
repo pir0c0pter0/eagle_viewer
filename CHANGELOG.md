@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2026-06-10
+
+### Fixed
+
+- Copper paint order is now deterministic — bottom copper (16), inner layers,
+  then top copper (1), with non-copper strokes above — instead of following
+  the order layers happen to appear in the XML, which could paint bottom
+  traces over top ones.
+- Mirrored (bottom-side) elements paint under the board copper, matching the
+  view from the top side.
+
 ## [2.0.1] - 2026-06-10
 
 ### Fixed

@@ -1,6 +1,6 @@
 {
   "name": "eagle_viewer",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Demo application to render Eagle files on the web",
   "main": "index.html",
 
